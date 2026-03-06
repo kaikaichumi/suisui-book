@@ -48,7 +48,7 @@
               <div class="service-name">{{ service.name }}</div>
               <div class="service-meta">{{ service.duration }} 分鐘</div>
             </div>
-            <div class="service-price">{{ formatPrice(service.price) }}</div>
+            <div class="service-price">{{ formatPrice(service) }}</div>
           </div>
         </div>
       </div>
@@ -132,7 +132,7 @@
           </div>
           <div class="summary-row">
             <span class="label">費用:</span>
-            <span class="price">{{ formatPrice(selected.service?.price) }}</span>
+            <span class="price">{{ formatPrice(selected.service) }}</span>
           </div>
         </div>
 
@@ -254,13 +254,16 @@ const maxDate = computed(() => {
   return d.toISOString().split('T')[0]
 })
 
+const preSelectedStaffId = route.query.staffId || null
+
 onMounted(async () => {
   // 載入服務列表
   try {
     const response = await api.get(`/stores/${slug}/services`)
     services.value = response.data
 
-    // 如果 URL 有 serviceId，自動選擇
+    // 如果 URL 有 serviceId，自動選擇該服務
+    // loadStaff() 會自動處理 preSelectedStaffId 的預選邏輯
     const serviceId = route.query.serviceId
     if (serviceId) {
       const service = services.value.find(s => s._id === serviceId)
@@ -287,6 +290,16 @@ async function loadStaff() {
   try {
     const response = await api.get(`/stores/${slug}/services/${selected.service._id}/staff`)
     staffList.value = response.data
+
+    // 如果有預選設計師（從探索頁進入），自動選擇並跳到時間選擇
+    if (preSelectedStaffId) {
+      const preStaff = staffList.value.find(s => s._id === preSelectedStaffId)
+      if (preStaff) {
+        selected.staff = preStaff
+        step.value = 3
+        return
+      }
+    }
 
     // 如果只有一個人員，自動選擇
     if (staffList.value.length === 1) {

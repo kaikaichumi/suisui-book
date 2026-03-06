@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 // 顧客頁面
+import DiscoveryPage from '../views/customer/DiscoveryPage.vue'
+import StylistPage from '../views/customer/StylistPage.vue'
 import StorePage from '../views/customer/StorePage.vue'
 import BookingPage from '../views/customer/BookingPage.vue'
 import MyBookings from '../views/customer/MyBookings.vue'
@@ -26,12 +28,21 @@ import SuperAdminLogin from '../views/superadmin/Login.vue'
 import SuperAdminDashboard from '../views/superadmin/Dashboard.vue'
 import SuperAdminStores from '../views/superadmin/Stores.vue'
 import SuperAdminBookings from '../views/superadmin/AllBookings.vue'
+import SuperAdminCategories from '../views/superadmin/Categories.vue'
 
 const routes = [
-  // 首頁重導向
+  // ===== 探索首頁 =====
   {
     path: '/',
-    redirect: '/superadmin/login'
+    name: 'Discovery',
+    component: DiscoveryPage
+  },
+
+  // ===== 設計師個人頁 =====
+  {
+    path: '/stylist/:slugOrId',
+    name: 'StylistPage',
+    component: StylistPage
   },
 
   // ===== LINE 登入回調 =====
@@ -129,6 +140,12 @@ const routes = [
     path: '/superadmin/bookings',
     name: 'SuperAdminBookings',
     component: SuperAdminBookings,
+    meta: { requiresSuperAdmin: true }
+  },
+  {
+    path: '/superadmin/categories',
+    name: 'SuperAdminCategories',
+    component: SuperAdminCategories,
     meta: { requiresSuperAdmin: true }
   }
 ]

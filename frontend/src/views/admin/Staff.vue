@@ -39,6 +39,7 @@
           </div>
         </div>
         <div class="staff-actions">
+          <button @click="openProfile(staff)" class="btn btn-primary btn-sm">個人檔案</button>
           <button @click="editStaff(staff)" class="btn btn-secondary btn-sm">編輯</button>
           <button
             @click="toggleActive(staff)"
@@ -89,12 +90,101 @@
         </form>
       </div>
     </div>
+    <!-- 個人檔案 Modal -->
+    <div v-if="showProfileModal" class="modal-overlay" @click.self="showProfileModal = false">
+      <div class="modal" style="max-width:600px;">
+        <div class="modal-header">
+          <h3 class="modal-title">{{ profileStaff?.name }} - 個人檔案</h3>
+          <button @click="showProfileModal = false" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+          <!-- 頭像 -->
+          <div class="form-group">
+            <label class="form-label">頭像</label>
+            <ImageUploader v-model="profileForm.avatar" placeholder="上傳頭像" />
+          </div>
+
+          <!-- 網址代稱 -->
+          <div class="form-group">
+            <label class="form-label">個人頁網址代稱</label>
+            <input v-model="profileForm.slug" class="form-input" placeholder="如: amy-stylist" />
+            <small class="text-muted">網址將會是 /stylist/{{ profileForm.slug || 'xxx' }}</small>
+          </div>
+
+          <!-- 自我介紹 -->
+          <div class="form-group">
+            <label class="form-label">自我介紹</label>
+            <textarea v-model="profileForm.bio" class="form-input" rows="3" maxlength="500" placeholder="介紹自己的專長和風格"></textarea>
+          </div>
+
+          <!-- 專長 -->
+          <div class="form-group">
+            <label class="form-label">專長標籤</label>
+            <div class="tags-input-wrap">
+              <div class="tags-list">
+                <span v-for="(tag, i) in profileForm.specialties" :key="i" class="tag-item">
+                  {{ tag }}
+                  <button @click="profileForm.specialties.splice(i, 1)" class="tag-remove">&times;</button>
+                </span>
+              </div>
+              <input
+                v-model="newTag"
+                class="form-input"
+                placeholder="輸入標籤後按 Enter"
+                @keydown.enter.prevent="addTag"
+              />
+            </div>
+          </div>
+
+          <!-- 社群連結 -->
+          <div class="form-group">
+            <label class="form-label">Instagram 連結</label>
+            <input v-model="profileForm.socialLinks.instagram" class="form-input" placeholder="IG 帳號或連結" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Facebook 連結</label>
+            <input v-model="profileForm.socialLinks.facebook" class="form-input" placeholder="FB 頁面連結" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">LINE ID</label>
+            <input v-model="profileForm.socialLinks.line" class="form-input" placeholder="LINE ID" />
+          </div>
+
+          <!-- 是否顯示在探索頁 -->
+          <div class="form-group">
+            <label class="checkbox-item">
+              <input type="checkbox" v-model="profileForm.discoverable" />
+              <span class="checkbox-label">在探索頁面上顯示此設計師</span>
+            </label>
+          </div>
+
+          <!-- 作品集 -->
+          <div class="form-group">
+            <label class="form-label">作品集</label>
+            <PortfolioManager
+              :items="portfolioItems"
+              @added="handlePortfolioAdd"
+              @edit="editPortfolioItem"
+              @delete="deletePortfolioItem"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showProfileModal = false">取消</button>
+          <button class="btn btn-primary" @click="saveProfile" :disabled="savingProfile">
+            {{ savingProfile ? '儲存中...' : '儲存檔案' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </AdminLayout>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import AdminLayout from '../../components/AdminLayout.vue'
+import ImageUploader from '../../components/ImageUploader.vue'
+import PortfolioManager from '../../components/PortfolioManager.vue'
 import api from '../../utils/api'
 
 const loading = ref(true)
@@ -104,6 +194,21 @@ const showModal = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
 const formError = ref('')
+
+// Profile modal
+const showProfileModal = ref(false)
+const profileStaff = ref(null)
+const savingProfile = ref(false)
+const newTag = ref('')
+const portfolioItems = ref([])
+const profileForm = reactive({
+  slug: '',
+  avatar: '',
+  bio: '',
+  specialties: [],
+  socialLinks: { instagram: '', facebook: '', line: '' },
+  discoverable: true
+})
 
 const form = reactive({
   name: '',
@@ -169,6 +274,90 @@ async function toggleActive(staff) {
   } catch (error) {
     alert(error.response?.data?.message || '操作失敗')
   }
+}
+
+// ===== 個人檔案功能 =====
+
+async function openProfile(staff) {
+  profileStaff.value = staff
+  profileForm.slug = staff.slug || ''
+  profileForm.avatar = staff.avatar || ''
+  profileForm.bio = staff.bio || ''
+  profileForm.specialties = [...(staff.specialties || [])]
+  profileForm.socialLinks = { instagram: '', facebook: '', line: '', ...(staff.socialLinks || {}) }
+  profileForm.discoverable = staff.discoverable !== false
+  newTag.value = ''
+
+  // 載入作品集
+  try {
+    const { data } = await api.get(`/admin/staff/${staff._id}/portfolio`)
+    portfolioItems.value = data
+  } catch (e) {
+    portfolioItems.value = []
+  }
+
+  showProfileModal.value = true
+}
+
+function addTag() {
+  const tag = newTag.value.trim()
+  if (tag && !profileForm.specialties.includes(tag)) {
+    profileForm.specialties.push(tag)
+  }
+  newTag.value = ''
+}
+
+async function saveProfile() {
+  savingProfile.value = true
+  try {
+    await api.put(`/admin/staff/${profileStaff.value._id}/profile`, {
+      slug: profileForm.slug || undefined,
+      avatar: profileForm.avatar,
+      bio: profileForm.bio,
+      specialties: profileForm.specialties,
+      socialLinks: profileForm.socialLinks,
+      discoverable: profileForm.discoverable
+    })
+    showProfileModal.value = false
+    await loadData()
+  } catch (e) {
+    alert(e.response?.data?.message || '儲存失敗')
+  } finally {
+    savingProfile.value = false
+  }
+}
+
+async function handlePortfolioAdd(uploadData) {
+  try {
+    const { data } = await api.post(`/admin/staff/${profileStaff.value._id}/portfolio`, {
+      imageUrl: uploadData.url,
+      thumbnailUrl: uploadData.thumbnailUrl
+    })
+    portfolioItems.value.push(data)
+  } catch (e) {
+    alert(e.response?.data?.message || '新增作品失敗')
+  }
+}
+
+async function deletePortfolioItem(item) {
+  if (!confirm('確定要刪除此作品嗎？')) return
+  try {
+    await api.delete(`/admin/staff/${profileStaff.value._id}/portfolio/${item._id}`)
+    portfolioItems.value = portfolioItems.value.filter(p => p._id !== item._id)
+  } catch (e) {
+    alert(e.response?.data?.message || '刪除失敗')
+  }
+}
+
+function editPortfolioItem(item) {
+  const title = prompt('作品標題:', item.title || '')
+  if (title === null) return
+  api.put(`/admin/staff/${profileStaff.value._id}/portfolio/${item._id}`, { title })
+    .then(({ data }) => {
+      const idx = portfolioItems.value.findIndex(p => p._id === item._id)
+      if (idx >= 0) portfolioItems.value[idx] = data
+    })
+    .catch(e => alert(e.response?.data?.message || '更新失敗'))
 }
 
 onMounted(() => {
@@ -308,6 +497,36 @@ onMounted(() => {
 .text-muted {
   color: var(--text-muted);
   font-size: 0.875rem;
+}
+
+.tags-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tag-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border-radius: var(--radius-full);
+  font-size: 0.8125rem;
+}
+.tag-remove {
+  background: none;
+  border: none;
+  color: var(--primary-dark);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  line-height: 1;
 }
 
 @media (max-width: 768px) {

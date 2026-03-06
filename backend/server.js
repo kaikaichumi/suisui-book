@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const Sentry = require('@sentry/node');
 const express = require('express');
 const cors = require('cors');
@@ -20,6 +21,8 @@ const apiRoutes = require('./routes/api');
 const adminRoutes = require('./routes/admin');
 const superadminRoutes = require('./routes/superadmin');
 const authRoutes = require('./routes/auth');
+const discoverRoutes = require('./routes/discover');
+const uploadRoutes = require('./routes/upload');
 const { startReminderJob } = require('./jobs/reminderJob');
 
 const app = express();
@@ -37,6 +40,8 @@ app.use('/api', apiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/discover', discoverRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // 健康檢查
 app.get('/health', (req, res) => {

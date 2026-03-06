@@ -47,7 +47,7 @@
               <div class="service-meta">{{ service.duration }} 分鐘</div>
               <div v-if="service.description" class="service-desc">{{ service.description }}</div>
             </div>
-            <div class="service-price">{{ formatPrice(service.price) }}</div>
+            <div class="service-price">{{ formatPrice(service) }}</div>
           </div>
         </div>
 

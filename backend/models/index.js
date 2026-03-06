@@ -4,6 +4,8 @@ const Service = require('./Service');
 const Staff = require('./Staff');
 const Booking = require('./Booking');
 const Customer = require('./Customer');
+const ServiceCategory = require('./ServiceCategory');
+const Portfolio = require('./Portfolio');
 
 module.exports = {
   SuperAdmin,
@@ -11,5 +13,7 @@ module.exports = {
   Service,
   Staff,
   Booking,
-  Customer
+  Customer,
+  ServiceCategory,
+  Portfolio
 };

@@ -1,9 +1,25 @@
 /**
- * 格式化價格為 NT$ x,xxx
+ * 格式化價格為 NT$ x,xxx 或 NT$ x,xxx ~ y,yyy
+ * 支援單一價格或 service 物件 { priceMin, priceMax }
  */
-export function formatPrice(price) {
-  if (price == null || isNaN(price)) return 'NT$ 0'
-  return `NT$ ${Number(price).toLocaleString('zh-TW')}`
+export function formatPrice(priceOrService) {
+  if (priceOrService == null) return 'NT$ 0'
+
+  // 如果傳入的是 service 物件
+  if (typeof priceOrService === 'object') {
+    const { priceMin, priceMax } = priceOrService
+    const min = Number(priceMin)
+    if (isNaN(min)) return 'NT$ 0'
+    const fmt = (n) => `NT$ ${n.toLocaleString('zh-TW')}`
+    if (priceMax && Number(priceMax) > min) {
+      return `${fmt(min)} ~ ${fmt(Number(priceMax))}`
+    }
+    return fmt(min)
+  }
+
+  // 向後相容：傳入單一數字
+  if (isNaN(priceOrService)) return 'NT$ 0'
+  return `NT$ ${Number(priceOrService).toLocaleString('zh-TW')}`
 }
 
 /**

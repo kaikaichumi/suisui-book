@@ -15,9 +15,14 @@ const serviceSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  price: {
+  priceMin: {
     type: Number,
     required: true,
+    min: 0
+  },
+  priceMax: {
+    type: Number,
+    default: null,
     min: 0
   },
   duration: {
@@ -37,6 +42,14 @@ const serviceSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Virtual: 向後相容，讓舊的 service.price 仍可用（回傳 priceMin）
+serviceSchema.virtual('price').get(function () {
+  return this.priceMin;
+});
+
+serviceSchema.set('toJSON', { virtuals: true });
+serviceSchema.set('toObject', { virtuals: true });
 
 serviceSchema.index({ storeId: 1, active: 1 });
 

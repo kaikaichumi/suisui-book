@@ -35,6 +35,66 @@
           </form>
         </section>
 
+        <!-- 店家位置 -->
+        <section class="card">
+          <h3 class="card-title">店家位置（用於探索頁附近搜尋）</h3>
+          <form @submit.prevent="saveLocation">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">經度 (Longitude)</label>
+                <input v-model.number="locationForm.lng" type="number" step="any" class="form-input" placeholder="如：121.5654" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">緯度 (Latitude)</label>
+                <input v-model.number="locationForm.lat" type="number" step="any" class="form-input" placeholder="如：25.0330" />
+              </div>
+              <div class="form-group full-width">
+                <button type="button" class="btn btn-secondary" @click="autoLocate" :disabled="locating">
+                  {{ locating ? '定位中...' : '使用目前位置自動填入' }}
+                </button>
+              </div>
+            </div>
+            <div v-if="locationForm.lat && locationForm.lng" class="location-preview">
+              目前座標: {{ locationForm.lat }}, {{ locationForm.lng }}
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" :disabled="savingLocation">
+                {{ savingLocation ? '儲存中...' : '儲存位置' }}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- 通知設定 -->
+        <section class="card">
+          <h3 class="card-title">通知設定</h3>
+          <form @submit.prevent="saveNotificationSettings">
+            <div class="notification-group">
+              <h4 class="notification-label">新預約通知</h4>
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="notifForm.newBooking.email" /> Email 通知
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="notifForm.newBooking.line" /> LINE 通知
+              </label>
+            </div>
+            <div class="notification-group">
+              <h4 class="notification-label">取消預約通知</h4>
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="notifForm.cancellation.email" /> Email 通知
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="notifForm.cancellation.line" /> LINE 通知
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" :disabled="savingNotif">
+                {{ savingNotif ? '儲存中...' : '儲存通知設定' }}
+              </button>
+            </div>
+          </form>
+        </section>
+
         <!-- 營業時間 -->
         <section class="card">
           <h3 class="card-title">營業時間</h3>
@@ -107,6 +167,9 @@ const loading = ref(true)
 const savingInfo = ref(false)
 const savingHours = ref(false)
 const savingPassword = ref(false)
+const savingLocation = ref(false)
+const savingNotif = ref(false)
+const locating = ref(false)
 
 const days = {
   mon: '週一',
@@ -134,6 +197,13 @@ const form = reactive({
   }
 })
 
+const locationForm = reactive({ lat: 0, lng: 0 })
+
+const notifForm = reactive({
+  newBooking: { email: true, line: false },
+  cancellation: { email: true, line: false }
+})
+
 const passwordForm = reactive({
   current: '',
   new: '',
@@ -142,7 +212,7 @@ const passwordForm = reactive({
 
 async function loadSettings() {
   try {
-    const response = await api.get('/admin/me')
+    const response = await api.get('/admin/store')
     const data = response.data
     form.name = data.name
     form.address = data.address || ''
@@ -150,6 +220,15 @@ async function loadSettings() {
     form.description = data.description || ''
     if (data.businessHours) {
       Object.assign(form.businessHours, data.businessHours)
+    }
+    // 位置
+    if (data.location?.coordinates) {
+      locationForm.lng = data.location.coordinates[0] || 0
+      locationForm.lat = data.location.coordinates[1] || 0
+    }
+    // 通知設定
+    if (data.notificationSettings) {
+      Object.assign(notifForm, data.notificationSettings)
     }
   } catch (error) {
     console.error('Failed to load settings:', error)
@@ -186,6 +265,54 @@ async function saveHours() {
     alert(error.response?.data?.message || '儲存失敗')
   } finally {
     savingHours.value = false
+  }
+}
+
+async function saveLocation() {
+  savingLocation.value = true
+  try {
+    await api.put('/admin/store', {
+      location: { coordinates: [locationForm.lng, locationForm.lat] }
+    })
+    alert('位置已儲存')
+  } catch (error) {
+    alert(error.response?.data?.message || '儲存失敗')
+  } finally {
+    savingLocation.value = false
+  }
+}
+
+function autoLocate() {
+  if (!navigator.geolocation) {
+    alert('您的瀏覽器不支援定位功能')
+    return
+  }
+  locating.value = true
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      locationForm.lat = pos.coords.latitude
+      locationForm.lng = pos.coords.longitude
+      locating.value = false
+    },
+    () => {
+      alert('無法取得位置，請確認已允許定位權限')
+      locating.value = false
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  )
+}
+
+async function saveNotificationSettings() {
+  savingNotif.value = true
+  try {
+    await api.put('/admin/store', {
+      notificationSettings: notifForm
+    })
+    alert('通知設定已儲存')
+  } catch (error) {
+    alert(error.response?.data?.message || '儲存失敗')
+  } finally {
+    savingNotif.value = false
   }
 }
 
@@ -323,6 +450,40 @@ onMounted(() => {
 
 .btn-block {
   width: 100%;
+}
+
+.location-preview {
+  padding: var(--spacing-sm);
+  background: var(--primary-light);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  color: var(--primary-dark);
+  margin-bottom: var(--spacing-sm);
+}
+.notification-group {
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border);
+}
+.notification-group:last-of-type {
+  border-bottom: none;
+}
+.notification-label {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  margin-bottom: var(--spacing-sm);
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--spacing-xs);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.checkbox-label input {
+  width: 16px;
+  height: 16px;
 }
 
 /* 響應式 */

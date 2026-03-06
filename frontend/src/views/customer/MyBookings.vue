@@ -77,7 +77,7 @@
               </div>
               <div class="detail-row">
                 <span class="label">費用:</span>
-                <span class="price">{{ formatPrice(booking.serviceId?.price) }}</span>
+                <span class="price">{{ formatPrice(booking.serviceId) }}</span>
               </div>
             </div>
 

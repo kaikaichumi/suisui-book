@@ -32,7 +32,7 @@
           </span>
           <span class="meta-item price">
             <span class="meta-icon">💰</span>
-            NT$ {{ service.price.toLocaleString() }}
+            {{ formatPrice(service) }}
           </span>
         </div>
         <p v-if="service.description" class="service-desc">{{ service.description }}</p>
@@ -58,14 +58,19 @@
         <form @submit.prevent="saveService" class="modal-body">
           <div v-if="formError" class="alert alert-error">{{ formError }}</div>
 
+          <div class="form-group">
+            <label class="form-label">服務名稱 *</label>
+            <input v-model="form.name" type="text" class="form-input" placeholder="例如: 洗剪吹" required />
+          </div>
+
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">服務名稱 *</label>
-              <input v-model="form.name" type="text" class="form-input" placeholder="例如: 洗剪吹" required />
+              <label class="form-label">價格 *</label>
+              <input v-model.number="form.priceMin" type="number" class="form-input" placeholder="例如: 500" min="0" required />
             </div>
             <div class="form-group">
-              <label class="form-label">價格 *</label>
-              <input v-model.number="form.price" type="number" class="form-input" placeholder="例如: 500" min="0" required />
+              <label class="form-label">最高價格 <span class="hint">（選填，不填為固定價格）</span></label>
+              <input v-model.number="form.priceMax" type="number" class="form-input" placeholder="例如: 1500" min="0" />
             </div>
           </div>
 
@@ -102,6 +107,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import AdminLayout from '../../components/AdminLayout.vue'
 import api from '../../utils/api'
+import { formatPrice } from '../../utils/format'
 
 const loading = ref(true)
 const services = ref([])
@@ -112,14 +118,16 @@ const formError = ref('')
 
 const form = reactive({
   name: '',
-  price: '',
+  priceMin: '',
+  priceMax: '',
   duration: 60,
   description: ''
 })
 
 function resetForm() {
   form.name = ''
-  form.price = ''
+  form.priceMin = ''
+  form.priceMax = ''
   form.duration = 60
   form.description = ''
   editingId.value = null
@@ -140,7 +148,8 @@ async function loadServices() {
 function editService(service) {
   editingId.value = service._id
   form.name = service.name
-  form.price = service.price
+  form.priceMin = service.priceMin
+  form.priceMax = service.priceMax || ''
   form.duration = service.duration
   form.description = service.description || ''
   showModal.value = true
@@ -276,6 +285,12 @@ onMounted(() => {
 .btn-outline-success:hover {
   background: var(--success);
   color: white;
+}
+
+.hint {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 0.75rem;
 }
 
 .form-row {

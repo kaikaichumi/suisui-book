@@ -19,9 +19,9 @@
         <span class="label">人員:</span>
         <span>{{ booking.staffId?.name }}</span>
       </div>
-      <div v-if="booking.serviceId?.price != null" class="info-row">
+      <div v-if="booking.serviceId?.priceMin != null" class="info-row">
         <span class="label">費用:</span>
-        <span class="price">{{ formatPrice(booking.serviceId.price) }}</span>
+        <span class="price">{{ formatPrice(booking.serviceId) }}</span>
       </div>
       <div class="info-row">
         <span class="label">顧客:</span>

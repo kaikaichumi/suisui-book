@@ -32,6 +32,36 @@ const storeSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // GeoJSON location for 2dsphere geo queries
+  location: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point'
+    },
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      default: [0, 0]
+    }
+  },
+  coverImage: {
+    type: String,
+    default: ''
+  },
+  categories: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ServiceCategory'
+  }],
+  notificationSettings: {
+    newBooking: {
+      email: { type: Boolean, default: true },
+      line: { type: Boolean, default: false }
+    },
+    cancellation: {
+      email: { type: Boolean, default: true },
+      line: { type: Boolean, default: false }
+    }
+  },
   businessHours: {
     mon: { type: businessHoursSchema, default: () => ({}) },
     tue: { type: businessHoursSchema, default: () => ({}) },
@@ -55,6 +85,9 @@ const storeSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+storeSchema.index({ location: '2dsphere' });
+storeSchema.index({ categories: 1, active: 1 });
 
 storeSchema.pre('save', async function(next) {
   if (!this.isModified('passwordHash')) return next();

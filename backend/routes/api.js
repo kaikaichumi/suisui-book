@@ -320,7 +320,7 @@ router.get('/stores/:slug/my-bookings', optionalCustomerAuth, async (req, res) =
     }
 
     const bookings = await Booking.find(query)
-      .populate('serviceId', 'name price duration')
+      .populate('serviceId', 'name priceMin priceMax duration')
       .populate('staffId', 'name')
       .sort({ date: -1, startTime: -1 })
       .limit(20);

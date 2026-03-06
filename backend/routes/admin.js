@@ -4,6 +4,7 @@ const Store = require('../models/Store');
 const Service = require('../models/Service');
 const Staff = require('../models/Staff');
 const Booking = require('../models/Booking');
+const Portfolio = require('../models/Portfolio');
 const { generateToken, verifyStore } = require('../middleware/auth');
 const { loginLimiter } = require('../middleware/rateLimit');
 const validate = require('../middleware/validate');
@@ -66,10 +67,24 @@ router.get('/store', verifyStore, async (req, res) => {
 // 更新店家資訊
 router.put('/store', verifyStore, async (req, res) => {
   try {
-    const { name, address, phone, description, businessHours, holidays } = req.body;
+    const { name, address, phone, description, businessHours, holidays,
+            location, coverImage, categories, notificationSettings } = req.body;
+    const updateData = { name, address, phone, description, businessHours, holidays };
+
+    // 地理位置更新
+    if (location && location.coordinates) {
+      updateData.location = {
+        type: 'Point',
+        coordinates: location.coordinates
+      };
+    }
+    if (coverImage !== undefined) updateData.coverImage = coverImage;
+    if (categories !== undefined) updateData.categories = categories;
+    if (notificationSettings !== undefined) updateData.notificationSettings = notificationSettings;
+
     const store = await Store.findByIdAndUpdate(
       req.store._id,
-      { name, address, phone, description, businessHours, holidays },
+      updateData,
       { new: true }
     ).select('-passwordHash');
     res.json(store);
@@ -91,12 +106,13 @@ router.get('/services', verifyStore, async (req, res) => {
 
 router.post('/services', verifyStore, validate(createServiceSchema), async (req, res) => {
   try {
-    const { name, description, price, duration, sortOrder } = req.body;
+    const { name, description, priceMin, price, priceMax, duration, sortOrder } = req.body;
     const service = new Service({
       storeId: req.store._id,
       name,
       description,
-      price,
+      priceMin: priceMin ?? price,
+      priceMax: priceMax || null,
       duration,
       sortOrder
     });
@@ -109,10 +125,14 @@ router.post('/services', verifyStore, validate(createServiceSchema), async (req,
 
 router.put('/services/:id', verifyStore, validate(updateServiceSchema), async (req, res) => {
   try {
-    const { name, description, price, duration, sortOrder, active } = req.body;
+    const { name, description, priceMin, price, priceMax, duration, sortOrder, active } = req.body;
+    const updateData = { name, description, duration, sortOrder, active };
+    if (priceMin !== undefined) updateData.priceMin = priceMin;
+    else if (price !== undefined) updateData.priceMin = price;
+    if (priceMax !== undefined) updateData.priceMax = priceMax || null;
     const service = await Service.findOneAndUpdate(
       { _id: req.params.id, storeId: req.store._id },
-      { name, description, price, duration, sortOrder, active },
+      updateData,
       { new: true }
     );
     if (!service) {
@@ -230,7 +250,7 @@ router.get('/bookings', verifyStore, async (req, res) => {
     }
 
     const bookings = await Booking.find(query)
-      .populate('serviceId', 'name price duration')
+      .populate('serviceId', 'name priceMin priceMax duration')
       .populate('staffId', 'name')
       .sort({ date: 1, startTime: 1 });
 
@@ -248,7 +268,7 @@ router.put('/bookings/:id', verifyStore, async (req, res) => {
       { status, note },
       { new: true }
     )
-      .populate('serviceId', 'name price duration')
+      .populate('serviceId', 'name priceMin priceMax duration')
       .populate('staffId', 'name');
 
     if (!booking) {
@@ -263,6 +283,122 @@ router.put('/bookings/:id', verifyStore, async (req, res) => {
     }
 
     res.json(booking);
+  } catch (error) {
+    res.status(500).json({ message: '伺服器錯誤' });
+  }
+});
+
+// ===== 設計師個人檔案管理 =====
+
+// 更新設計師個人檔案（bio, avatar, specialties, socialLinks 等）
+router.put('/staff/:id/profile', verifyStore, async (req, res) => {
+  try {
+    const { slug, avatar, bio, specialties, categories, socialLinks, discoverable } = req.body;
+    const updateData = {};
+
+    if (slug !== undefined) updateData.slug = slug;
+    if (avatar !== undefined) updateData.avatar = avatar;
+    if (bio !== undefined) updateData.bio = bio;
+    if (specialties !== undefined) updateData.specialties = specialties;
+    if (categories !== undefined) updateData.categories = categories;
+    if (socialLinks !== undefined) updateData.socialLinks = socialLinks;
+    if (discoverable !== undefined) updateData.discoverable = discoverable;
+
+    const staff = await Staff.findOneAndUpdate(
+      { _id: req.params.id, storeId: req.store._id },
+      updateData,
+      { new: true }
+    ).populate('services', 'name').populate('categories', 'name slug icon');
+
+    if (!staff) {
+      return res.status(404).json({ message: '人員不存在' });
+    }
+    res.json(staff);
+  } catch (error) {
+    if (error.code === 11000 && error.keyPattern?.slug) {
+      return res.status(400).json({ message: '此網址代稱已被使用，請換一個' });
+    }
+    res.status(500).json({ message: '伺服器錯誤' });
+  }
+});
+
+// 取得設計師作品集
+router.get('/staff/:id/portfolio', verifyStore, async (req, res) => {
+  try {
+    const staff = await Staff.findOne({ _id: req.params.id, storeId: req.store._id });
+    if (!staff) {
+      return res.status(404).json({ message: '人員不存在' });
+    }
+
+    const portfolio = await Portfolio.find({ staffId: req.params.id })
+      .sort({ sortOrder: 1, createdAt: -1 });
+    res.json(portfolio);
+  } catch (error) {
+    res.status(500).json({ message: '伺服器錯誤' });
+  }
+});
+
+// 新增作品
+router.post('/staff/:id/portfolio', verifyStore, async (req, res) => {
+  try {
+    const staff = await Staff.findOne({ _id: req.params.id, storeId: req.store._id });
+    if (!staff) {
+      return res.status(404).json({ message: '人員不存在' });
+    }
+
+    const { imageUrl, thumbnailUrl, title, description, category, tags, sortOrder } = req.body;
+    if (!imageUrl) {
+      return res.status(400).json({ message: '請提供圖片網址' });
+    }
+
+    const item = new Portfolio({
+      staffId: req.params.id,
+      storeId: req.store._id,
+      imageUrl,
+      thumbnailUrl: thumbnailUrl || '',
+      title: title || '',
+      description: description || '',
+      category,
+      tags: tags || [],
+      sortOrder: sortOrder || 0
+    });
+    await item.save();
+    res.status(201).json(item);
+  } catch (error) {
+    res.status(500).json({ message: '伺服器錯誤' });
+  }
+});
+
+// 更新作品資訊
+router.put('/staff/:id/portfolio/:pid', verifyStore, async (req, res) => {
+  try {
+    const { title, description, category, tags, sortOrder, active } = req.body;
+    const item = await Portfolio.findOneAndUpdate(
+      { _id: req.params.pid, staffId: req.params.id, storeId: req.store._id },
+      { title, description, category, tags, sortOrder, active },
+      { new: true }
+    );
+    if (!item) {
+      return res.status(404).json({ message: '作品不存在' });
+    }
+    res.json(item);
+  } catch (error) {
+    res.status(500).json({ message: '伺服器錯誤' });
+  }
+});
+
+// 刪除作品
+router.delete('/staff/:id/portfolio/:pid', verifyStore, async (req, res) => {
+  try {
+    const item = await Portfolio.findOneAndDelete({
+      _id: req.params.pid,
+      staffId: req.params.id,
+      storeId: req.store._id
+    });
+    if (!item) {
+      return res.status(404).json({ message: '作品不存在' });
+    }
+    res.json({ message: '作品已刪除' });
   } catch (error) {
     res.status(500).json({ message: '伺服器錯誤' });
   }
