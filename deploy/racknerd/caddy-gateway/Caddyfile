@@ -1,0 +1,20 @@
+# ── SuiSui Book ──────────────────────────────────────────────
+suisui.yourdomain.com {
+    encode gzip zstd
+    tls your@email.com
+
+    # /api 轉到 backend，其餘轉到 frontend
+    handle /api/* {
+        reverse_proxy suisui-book-backend-1:5000
+    }
+    handle {
+        reverse_proxy suisui-book-frontend-1:80
+    }
+}
+
+# ── 未來的網站，照格式加在這裡 ──────────────────────────────
+# other-site.yourdomain.com {
+#     encode gzip zstd
+#     tls your@email.com
+#     reverse_proxy other-app-frontend-1:3000
+# }

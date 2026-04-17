@@ -1,0 +1,13 @@
+:80 {
+    encode gzip zstd
+    reverse_proxy frontend:80
+}
+
+# After your domain DNS A record points to this VM, enable HTTPS by
+# uncommenting and replacing the example values below.
+#
+# your-domain.com, www.your-domain.com {
+#     encode gzip zstd
+#     tls your-email@example.com
+#     reverse_proxy frontend:80
+# }
