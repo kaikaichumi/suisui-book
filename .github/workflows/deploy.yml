@@ -68,13 +68,9 @@ jobs:
           host:     ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key:      ${{ secrets.VM_SSH_KEY }}
-          envs:     GHCR_TOKEN,GHCR_USER
           script: |
             set -e
             cd ~/suisui-book
-
-            # 登入 GHCR（credentials 會快取在 ~/.docker/config.json）
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
             # 更新 code（Caddyfile / env.example 等設定檔）
             git pull --ff-only
@@ -90,6 +86,3 @@ jobs:
             curl -sf http://localhost/api/health \
               && echo "✓ Deploy successful: $(date)" \
               || { echo "✗ Health check failed"; exit 1; }
-        env:
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          GHCR_USER:  ${{ github.repository_owner }}
